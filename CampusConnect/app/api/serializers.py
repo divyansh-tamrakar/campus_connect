@@ -2,13 +2,19 @@ from rest_framework import serializers
 
 from django.contrib.auth import authenticate
 
-from ..models import User
+from ..models import User, Department
+
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id','username', 'email', 'department')
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password']
+        fields = ['id', 'username', 'email', 'password', 'department', 'name']
         extra_kwargs = {
             'password': {'write_only': True}
         }
@@ -25,24 +31,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
             instance.save()
         return instance
     
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    users = UserSerializer(many=True, read_only=True)
+    class Meta:
+        model = Department
+        fields = ['id', 'name', 'users']
     
-class UserLoginSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=50)
-    password = serializers.CharField(write_only=True)
-    
-    def validate(self, data):
-        username = data.get('username')
-        password = data.get('password')
-        
-        if username and password:
-            user = authenticate(self.context.get('request'), username=username, password=password)
-            
-            if not user:
-                raise serializers.ValidationError("Incorrect Credentials", 400)
-            
-            if not user.is_active:
-                raise serializers.ValidationError('No active user found', 400)
-            
-            return user
-        else:
-            raise serializers.ValidationError({'detail':'Must provide both username and password.'}, 400)
+    def get_users(self, department_id):
+        users = User.objects.filter(department=department_id)
+        serializers = UserSerializer(users, many=True)
+        return serializers.data
